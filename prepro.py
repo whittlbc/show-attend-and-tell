@@ -18,21 +18,37 @@ def normalize_image(arr):
   return (1.0 * arr) / 255
 
 
+def one_hot(vector, vocab_len):
+  arr = []
+
+  for num in vector:
+    row = [0] * vocab_len
+    row[num] = 1
+    arr.append(row)
+
+  return arr
+
+
 def format_caption(caption):
+  # Strip/sub out the chars we don't want
   cap = re.sub('[.,"\')(]', '', caption).replace('&', 'and').replace('-', ' ')
   split_cap = cap.split()
 
+  # Return early if caption is too long
   if len(split_cap) > max_caption_words:
     return None
 
+  # Strip each word to avoid multiple consecutive spaces; lowercase everthing too
   return ' '.join([w.strip() for w in cap.split()]).lower()
 
 
 def format_split(split):
   # Get the raw downloaded caption data for the provided split
+  # See data/example_annotation.json for a visual of this JSON structure
   with open('{}/captions_{}2014.json'.format(annotations_dir, split)) as f:
     caption_data = json.load(f)
 
+  # Map image ids to their filenames for later
   image_id_to_filename = {img['id']: img['file_name'] for img in caption_data['images']}
 
   # Get caption annotations sorted by image_id
@@ -61,30 +77,22 @@ def format_split(split):
 
 
 def vectorize_cap(caption, word_to_index):
+  # Each caption will start with the start token
   vec = [word_to_index['<START>']]
 
   for w in caption.split(' '):
     if w in word_to_index:
       vec.append(word_to_index[w])
 
+  # Each caption will end with the end token
   vec.append(word_to_index['<END>'])
 
-  # Pad vector with nulls to desired length
+  # Pad the rest of the vector with null tokens if not long enough
   for j in range(caption_vec_len - len(vec)):
     vec.append(word_to_index['<NULL>'])
 
+  # Return the one-hot representation of the vector caption
   return one_hot(vec, len(word_to_index))
-
-
-def one_hot(vector, vocab_len):
-  arr = []
-
-  for num in vector:
-    row = [0] * vocab_len
-    row[num] = 1
-    arr.append(row)
-
-  return arr
 
 
 def build_vocab(data, word_count_threshold=1):
@@ -117,13 +125,15 @@ def build_vocab(data, word_count_threshold=1):
 
 def get_split_data():
   train_data = format_split('train')
+
+  # We'll be splitting the val data into val AND test datasets
   val_test_data = format_split('val')
 
   len_val_test_data = len(val_test_data)
-
   val_cutoff = int(0.1 * len_val_test_data)
   test_cutoff = int(0.2 * len_val_test_data)
 
+  # Split val and test data at the specified cutoffs
   val_data = val_test_data[:val_cutoff]
   test_data = val_test_data[val_cutoff:test_cutoff]
 
@@ -137,10 +147,19 @@ def get_split_data():
 
 
 def create_split_dataset(split, annotations, f, word_to_index, vggnet, sess):
+  # Create an hdf5 group for this split (train, val, or test)
   g = f.create_group(split)
 
   num_captions = len(annotations)
+
+  # This won't be the same as num_captions since we have multiple captions/image
   num_images = len({a['image_id']: None for a in annotations})
+
+  # Create our datasets:
+  # - captions
+  # - images
+  # - image_idxs
+  # - features
 
   captions = g.create_dataset('captions',
                               shape=(num_captions, caption_vec_len, len(word_to_index)),
@@ -150,12 +169,15 @@ def create_split_dataset(split, annotations, f, word_to_index, vggnet, sess):
                             shape=(num_images, image_height, image_width, len(image_color_repr)),
                             dtype=np.float32)
 
-  image_idxs = g.create_dataset('image_idxs', shape=(num_captions,), dtype=np.int32)
+  image_idxs = g.create_dataset('image_idxs',
+                                shape=(num_captions,),
+                                dtype=np.int32)
 
-  features = g.create_dataset('features', shape=(num_images, 196, 512), dtype=np.float32)
+  features = g.create_dataset('features',
+                              shape=(num_images, feature_vec_len, feature_vec_dim),
+                              dtype=np.float32)
 
   image_id_to_idx = {}
-
   for i, data in enumerate(annotations):
     image_id = data['image_id']
     image_idx = image_id_to_idx.get(image_id)
@@ -180,8 +202,6 @@ def create_split_dataset(split, annotations, f, word_to_index, vggnet, sess):
     image_idxs[i] = image_idx
     captions[i] = vectorize_cap(data['caption'], word_to_index)
 
-  # TODO: Delete the 'images' and 'image_idxs' datasets now that we don't need them anymore?
-
 
 if __name__ == '__main__':
   # Get train, val, and test data
@@ -193,10 +213,9 @@ if __name__ == '__main__':
   # Save the word_to_index map (will need later for CaptionGenerator)
   save_pickle(word_to_index, word_to_index_path)
 
-  # Our hdf5 dataset that will hold all of ze data
   dataset = h5py.File(dataset_path, 'w')
 
-  # Extract conv5_3 feature vectors
+  # Utilize our Vgg19 convnet
   vggnet = Vgg19(vgg_model_path)
   vggnet.build()
 
@@ -204,9 +223,8 @@ if __name__ == '__main__':
   sess = tf.Session()
   sess.run(tf.global_variables_initializer())
 
-  # For each split, create an hdf5 group with nested datasets: captions, images, image_idxs
+  # For each split, create an hdf5 group with multiple datasets inside it
   for split, annotations in split_data.iteritems():
     create_split_dataset(split, annotations, dataset, word_to_index, vggnet, sess)
 
-  # We done here.
   dataset.close()

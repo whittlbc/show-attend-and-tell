@@ -13,3 +13,6 @@ word_to_index_path = data_dir + '/train/word_to_index.pkl'
 image_height = 224
 image_width = 224
 image_color_repr = 'RGB'
+
+feature_vec_len = 196
+feature_vec_dim = 512
