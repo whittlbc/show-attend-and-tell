@@ -1,8 +1,8 @@
-numpy
-matplotlib
-scipy
-scikit-image
-hickle
-Pillow
-pandas
-h5py
+numpy==1.13.3
+matplotlib==2.1.0
+scikit-image==0.13.1
+scipy==0.19.1
+hickle==2.1.0
+Pillow==4.3.0
+h5py==2.7.1
+pandas==0.20.3
