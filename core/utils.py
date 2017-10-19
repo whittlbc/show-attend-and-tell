@@ -106,3 +106,18 @@ def save_pickle(data, path):
   with open(path, 'wb') as f:
     pickle.dump(data, f, pickle.HIGHEST_PROTOCOL)
     print ('Saved %s..' % path)
+
+
+def normalize_image(arr):
+  return (1.0 * arr) / 255
+
+
+def one_hot(vector, vocab_len):
+  arr = []
+
+  for num in vector:
+    row = [0] * vocab_len
+    row[num] = 1
+    arr.append(row)
+
+  return arr

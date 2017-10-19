@@ -3,30 +3,11 @@ import h5py
 import json
 import numpy as np
 import tensorflow as tf
+from scipy import ndimage
 from collections import Counter
 from core.definitions import *
-from core.utils import save_pickle
-from scipy import ndimage
+from core.utils import save_pickle, normalize_image, one_hot
 from core.vggnet import Vgg19
-
-batch_size = 100  # get from somewhere more sharable
-max_caption_words = 15
-caption_vec_len = max_caption_words + 2  # +2 to account for <START> and <END>
-
-
-def normalize_image(arr):
-  return (1.0 * arr) / 255
-
-
-def one_hot(vector, vocab_len):
-  arr = []
-
-  for num in vector:
-    row = [0] * vocab_len
-    row[num] = 1
-    arr.append(row)
-
-  return arr
 
 
 def format_caption(caption):
@@ -174,7 +155,7 @@ def create_split_dataset(split, annotations, f, word_to_index, vggnet, sess):
                                 dtype=np.int32)
 
   features = g.create_dataset('features',
-                              shape=(num_images, feature_vec_len, feature_vec_dim),
+                              shape=(num_images, feat_vec_len, feat_vec_dim),
                               dtype=np.float32)
 
   image_id_to_idx = {}
@@ -188,9 +169,9 @@ def create_split_dataset(split, annotations, f, word_to_index, vggnet, sess):
 
       images[image_idx] = normalize_image(ndimage.imread(data['image_path'], mode=image_color_repr))
 
-      if image_idx % batch_size and image_idx > 0:
+      if image_idx % feat_batch_size and image_idx > 0:
         end_idx = image_idx
-        start_idx = end_idx - batch_size
+        start_idx = end_idx - feat_batch_size
 
         image_batch = images[start_idx:end_idx]
 
