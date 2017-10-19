@@ -1,11 +1,13 @@
 import re
 import h5py
-import numpy as np
 import json
+import numpy as np
+import tensorflow as tf
 from collections import Counter
 from core.definitions import *
 from core.utils import save_pickle
 from scipy import ndimage
+from core.vggnet import Vgg19
 
 batch_size = 100  # get from somewhere more sharable
 max_caption_words = 15
@@ -134,7 +136,7 @@ def get_split_data():
   return data
 
 
-def create_split_datasets(split, annotations, f, word_to_index):
+def create_split_dataset(split, annotations, f, word_to_index, vggnet, sess):
   g = f.create_group(split)
 
   num_captions = len(annotations)
@@ -150,7 +152,10 @@ def create_split_datasets(split, annotations, f, word_to_index):
 
   image_idxs = g.create_dataset('image_idxs', shape=(num_captions,), dtype=np.int32)
 
+  features = g.create_dataset('features', shape=(num_images, 196, 512), dtype=np.float32)
+
   image_id_to_idx = {}
+
   for i, data in enumerate(annotations):
     image_id = data['image_id']
     image_idx = image_id_to_idx.get(image_id)
@@ -160,13 +165,25 @@ def create_split_datasets(split, annotations, f, word_to_index):
       image_id_to_idx[image_id] = image_idx
       images[image_idx] = normalize(ndimage.imread(data['image_path'], mode=image_color_repr))
 
-    image_idxs[i] = image_idx
+      if image_idx % batch_size and image_idx > 0:
+        end_idx = image_idx
+        start_idx = end_idx - batch_size
 
+        image_batch = images[start_idx:end_idx]
+
+        feats = sess.run(vggnet.features, feed_dict={vggnet.images: image_batch})
+
+        # TODO: think this assignment might break....check this
+        features[start_idx:end_idx, :] = feats
+
+    image_idxs[i] = image_idx
     captions[i] = vectorize_cap(data['caption'], word_to_index)
+
+  # TODO: Delete the 'images' and 'image_idxs' datasets now that we don't need them anymore?
 
 
 if __name__ == '__main__':
-  # Get 'train', 'val', and 'test' data
+  # Get train, val, and test data
   split_data = get_split_data()
 
   # Create a word_to_index map based on the vocab in the train data ONLY
@@ -175,10 +192,20 @@ if __name__ == '__main__':
   # Save the word_to_index map (will need later for CaptionGenerator)
   save_pickle(word_to_index, '{}/train/word_to_index.pkl'.format(data_dir))
 
+  # Our hdf5 dataset that will hold all of ze data
   dataset = h5py.File(dataset_path, 'w')
+
+  # Extract conv5_3 feature vectors
+  vggnet = Vgg19(vgg_model_path)
+  vggnet.build()
+
+  # Init a new tensorflow session
+  sess = tf.Session()
+  sess.run(tf.global_variables_initializer())
 
   # For each split, create an hdf5 group with nested datasets: captions, images, image_idxs
   for split, annotations in split_data.iteritems():
-    create_split_datasets(split, annotations, dataset, word_to_index)
+    create_split_dataset(split, annotations, dataset, word_to_index, vggnet, sess)
 
+  # We done here.
   dataset.close()
