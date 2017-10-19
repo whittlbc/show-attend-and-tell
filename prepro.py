@@ -163,24 +163,32 @@ def create_split_dataset(split, annotations, f, word_to_index, vggnet, sess):
     image_id = data['image_id']
     image_idx = image_id_to_idx.get(image_id)
 
+    # If newly seen image...
     if image_idx is None:
+      # The new image's index will just be the number of already seen images
       image_idx = len(image_id_to_idx)
       image_id_to_idx[image_id] = image_idx
 
+      # Add the normalized, vectorized image to the images dataset
       images[image_idx] = normalize_image(ndimage.imread(data['image_path'], mode=image_color_repr))
 
-      if image_idx % feat_batch_size and image_idx > 0:
+      # If we've reached a batch_size interval...
+      if image_idx % feat_batch_size == 0 and image_idx > 0:
+        # Get the last image batch
         end_idx = image_idx
         start_idx = end_idx - feat_batch_size
-
         image_batch = images[start_idx:end_idx]
 
+        # Extract conv5_3 feature vectors for this batch
         feats = sess.run(vggnet.features, feed_dict={vggnet.images: image_batch})
 
         # TODO: think this assignment might break....check this
+        # Add these features to the dataset
         features[start_idx:end_idx, :] = feats
 
     image_idxs[i] = image_idx
+
+    # Add the vectorized, one-hot repr of the caption to the captions dataset
     captions[i] = vectorize_cap(data['caption'], word_to_index)
 
 
