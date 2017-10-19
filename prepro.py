@@ -138,7 +138,7 @@ def create_split_dataset(split, annotations, f, word_to_index, vggnet, sess):
 
   # Create our datasets:
   # - captions
-  # - images
+  # - image_paths
   # - image_idxs
   # - features
 
@@ -146,9 +146,10 @@ def create_split_dataset(split, annotations, f, word_to_index, vggnet, sess):
                               shape=(num_captions, caption_vec_len, len(word_to_index)),
                               dtype=np.float32)
 
-  images = g.create_dataset('images',
-                            shape=(num_images, image_height, image_width, len(image_color_repr)),
-                            dtype=np.float32)
+  image_paths = g.create_dataset('image_paths',
+                                 shape=(num_images,),
+                                 dtype=h5py.special_dtype(vlen=unicode))
+
 
   image_idxs = g.create_dataset('image_idxs',
                                 shape=(num_captions,),
@@ -159,6 +160,7 @@ def create_split_dataset(split, annotations, f, word_to_index, vggnet, sess):
                               dtype=np.float32)
 
   image_id_to_idx = {}
+  image_batch = []
   for i, data in enumerate(annotations):
     image_id = data['image_id']
     image_idx = image_id_to_idx.get(image_id)
@@ -169,23 +171,28 @@ def create_split_dataset(split, annotations, f, word_to_index, vggnet, sess):
       image_idx = len(image_id_to_idx)
       image_id_to_idx[image_id] = image_idx
 
-      # Add the normalized, vectorized image to the images dataset
-      images[image_idx] = normalize_image(ndimage.imread(data['image_path'], mode=image_color_repr))
+      # Add image path to image_paths dataset
+      image_paths[image_idx] = data['image_path']
+
+      # Append normalized, vectorized image to this batch
+      image_batch.append(normalize_image(ndimage.imread(data['image_path'], mode=image_color_repr)))
 
       # If we've reached a batch_size interval...
       if image_idx % feat_batch_size == 0 and image_idx > 0:
         # Get the last image batch
         end_idx = image_idx
         start_idx = end_idx - feat_batch_size
-        image_batch = images[start_idx:end_idx]
 
         # Extract conv5_3 feature vectors for this batch
         feats = sess.run(vggnet.features, feed_dict={vggnet.images: image_batch})
 
-        # TODO: think this assignment might break....check this
         # Add to the features dataset
-        features[start_idx:end_idx, :] = feats
+        features[start_idx:end_idx] = feats
 
+        # Re-empty the image batch to prep for the next one
+        image_batch = []
+
+    # Add to image_idxs dataset
     image_idxs[i] = image_idx
 
     # Add the vectorized, one-hot repr of the caption to the captions dataset
