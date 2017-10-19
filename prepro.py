@@ -14,7 +14,7 @@ max_caption_words = 15
 caption_vec_len = max_caption_words + 2  # +2 to account for <START> and <END>
 
 
-def normalize(arr):
+def normalize_image(arr):
   return (1.0 * arr) / 255
 
 
@@ -163,7 +163,8 @@ def create_split_dataset(split, annotations, f, word_to_index, vggnet, sess):
     if image_idx is None:
       image_idx = len(image_id_to_idx)
       image_id_to_idx[image_id] = image_idx
-      images[image_idx] = normalize(ndimage.imread(data['image_path'], mode=image_color_repr))
+
+      images[image_idx] = normalize_image(ndimage.imread(data['image_path'], mode=image_color_repr))
 
       if image_idx % batch_size and image_idx > 0:
         end_idx = image_idx
@@ -190,7 +191,7 @@ if __name__ == '__main__':
   word_to_index = build_vocab(split_data['train'])
 
   # Save the word_to_index map (will need later for CaptionGenerator)
-  save_pickle(word_to_index, '{}/train/word_to_index.pkl'.format(data_dir))
+  save_pickle(word_to_index, word_to_index_path)
 
   # Our hdf5 dataset that will hold all of ze data
   dataset = h5py.File(dataset_path, 'w')

@@ -1,17 +1,20 @@
 import h5py
 from core.solver import CaptioningSolver
 from core.model import CaptionGenerator
-from core.definitions import dataset_path
+from core.definitions import dataset_path, word_to_index_path
+from core.utils import load_pickle
 
 
 def main():
   data = h5py.File(dataset_path, 'r')
 
   train_data = data.get('train')
-  val_data = data.get('val')
-  word_to_idx = data.get('word_to_idx')
 
-  model = CaptionGenerator(word_to_idx, alpha_c=1.0)
+  val_data = data.get('val')
+
+  word_to_index = load_pickle(word_to_index_path)
+
+  model = CaptionGenerator(word_to_index, alpha_c=1.0)
 
   solver = CaptioningSolver(model, train_data, val_data,
                             n_epochs=20, batch_size=128, update_rule='adam',
