@@ -4,5 +4,5 @@ scipy
 scikit-image
 hickle
 Pillow
-
-
+pandas
+h5py

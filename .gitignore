@@ -1,0 +1,10 @@
+venv/
+*.pyc
+*.log
+.env
+.idea/
+tmp/
+*.pem
+bin/
+data/annotations/
+image/

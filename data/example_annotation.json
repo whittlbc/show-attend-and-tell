@@ -1,0 +1,15 @@
+{
+	"images": [
+		{
+			"id": 57870,
+			"file_name": "COCO_train2014_000000057870.jpg"
+		}
+	],
+	"annotations": [
+		{
+			"id": 37, 
+			"image_id": 57870,
+			"caption": "A bicycle replica with a clock as the front wheel."
+		}
+	]
+}
