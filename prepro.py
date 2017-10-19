@@ -183,7 +183,7 @@ def create_split_dataset(split, annotations, f, word_to_index, vggnet, sess):
         feats = sess.run(vggnet.features, feed_dict={vggnet.images: image_batch})
 
         # TODO: think this assignment might break....check this
-        # Add these features to the dataset
+        # Add to the features dataset
         features[start_idx:end_idx, :] = feats
 
     image_idxs[i] = image_idx
@@ -216,4 +216,5 @@ if __name__ == '__main__':
   for split, annotations in split_data.iteritems():
     create_split_dataset(split, annotations, dataset, word_to_index, vggnet, sess)
 
+  # We done here.
   dataset.close()
