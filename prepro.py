@@ -182,9 +182,6 @@ def create_split_dataset(split, annotations, f, word_to_index, vggnet, sess):
       # Add image path to image_paths dataset
       image_paths[image_idx] = data['image_path']
 
-      # Append normalized, vectorized image to this batch
-      image_batch.append(normalize_image(ndimage.imread(data['image_path'], mode=image_color_repr)))
-
       # If we've reached a batch_size interval...
       if image_idx % feat_batch_size == 0 and image_idx > 0:
         # Get the last image batch
@@ -199,6 +196,9 @@ def create_split_dataset(split, annotations, f, word_to_index, vggnet, sess):
 
         # Re-empty the image batch to prep for the next one
         image_batch = []
+
+      # Append normalized, vectorized image to this batch
+      image_batch.append(normalize_image(ndimage.imread(data['image_path'], mode=image_color_repr)))
 
     # Add to image_idxs dataset
     image_idxs[i] = image_idx
