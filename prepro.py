@@ -24,6 +24,8 @@ def format_caption(caption):
 
 
 def format_split(split):
+  print 'Formatting {} split...'.format(split)
+
   # Get the raw downloaded caption data for the provided split
   # See data/example_annotation.json for a visual of this JSON structure
   with open('{}/captions_{}2014.json'.format(annotations_dir, split)) as f:
@@ -114,6 +116,8 @@ def get_split_data():
   val_cutoff = int(0.1 * len_val_test_data)
   test_cutoff = int(0.2 * len_val_test_data)
 
+  print 'Taking test split from val...'
+
   # Split val and test data at the specified cutoffs
   val_data = val_test_data[:val_cutoff]
   test_data = val_test_data[val_cutoff:test_cutoff]
@@ -129,6 +133,7 @@ def get_split_data():
 
 def create_split_dataset(split, annotations, f, word_to_index, vggnet, sess):
   # Create an hdf5 group for this split (train, val, or test)
+  print 'Creating {} group...'.format(split)
   g = f.create_group(split)
 
   num_captions = len(annotations)
@@ -136,11 +141,14 @@ def create_split_dataset(split, annotations, f, word_to_index, vggnet, sess):
   # This won't be the same as num_captions since we have multiple captions/image
   num_images = len({a['image_id']: None for a in annotations})
 
+  print '\nSplit info\nCaptions: {}\nImages: {}\n'.format(num_captions,  num_images)
+
   # Create our datasets:
   # - captions
   # - image_paths
   # - image_idxs
   # - features
+
 
   captions = g.create_dataset('captions',
                               shape=(num_captions, caption_vec_len, len(word_to_index)),
@@ -158,6 +166,8 @@ def create_split_dataset(split, annotations, f, word_to_index, vggnet, sess):
   features = g.create_dataset('features',
                               shape=(num_images, feat_vec_len, feat_vec_dim),
                               dtype=np.float32)
+
+  print 'Populating {} datasets...'.format(split)
 
   image_id_to_idx = {}
   image_batch = []
@@ -198,30 +208,37 @@ def create_split_dataset(split, annotations, f, word_to_index, vggnet, sess):
     # Add the vectorized, one-hot repr of the caption to the captions dataset
     captions[i] = vectorize_cap(data['caption'], word_to_index)
 
+    if (i + 1) % 100 == 0:
+      print '{}/{}'.format(i+1, num_captions)
+
 
 if __name__ == '__main__':
   # Get train, val, and test data
+  print 'Splitting data...'
   split_data = get_split_data()
 
+  print 'Building vocab...'
   # Create a word_to_index map based on the vocab in the train data ONLY
   word_to_index = build_vocab(split_data['train'])
 
-  # Save the word_to_index map (will need later for CaptionGenerator)
+  print 'Saving vocab for later...'
   save_pickle(word_to_index, word_to_index_path)
 
   dataset = h5py.File(dataset_path, 'w')
 
-  # Utilize our Vgg19 convnet
+  print 'Constructing Vgg19...'
   vggnet = Vgg19(vgg_model_path)
   vggnet.build()
 
-  # Init a new tensorflow session
+  print 'Initializing tensorflow session...'
   sess = tf.Session()
   sess.run(tf.global_variables_initializer())
 
   # For each split, create an hdf5 group with multiple datasets inside it
+  print 'Populating HDF5 dataset...'
   for split, annotations in split_data.iteritems():
     create_split_dataset(split, annotations, dataset, word_to_index, vggnet, sess)
 
   # We done here.
+  print 'DONE.'
   dataset.close()
