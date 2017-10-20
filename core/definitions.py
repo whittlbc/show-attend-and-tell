@@ -16,7 +16,7 @@ image_color_repr = 'RGB'
 
 feat_vec_len = 196
 feat_vec_dim = 512
-feat_batch_size = 50
+feat_batch_size = 20
 
 max_caption_words = 15
 caption_vec_len = max_caption_words + 2  # +2 to account for <START> and <END>
